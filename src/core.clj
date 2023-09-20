@@ -85,14 +85,13 @@
 
 
 (defn decode-file [f]
-  (str/join "\n"
-            (map (comp (fn [{:keys [src dst]}] (format "mov %s, %s"
-                                                       (name dst)
-                                                       (name src)))
-                       decode)
-                 (read-instructions f))))
+  (map (comp (fn [{:keys [src dst]}] (format "mov %s, %s"
+                                             (name dst)
+                                             (name src)))
+             decode)
+       (read-instructions f)))
 
 (comment
-  (decode-file "../support/one-instruction")
-  (decode-file "../support/multiple-instructions")
+  (decode-file "support/one-instruction")
+  (decode-file "support/multiple-instructions")
   nil)
