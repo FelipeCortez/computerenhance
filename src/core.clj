@@ -30,6 +30,8 @@
    2r110 :si
    2r111 :di})
 
+(defmacro locals [& xs] (zipmap (map keyword xs) xs))
+
 (defn decode [instruction]
   (let [byte-1
         (bit-shift-right instruction 8)
@@ -65,14 +67,7 @@
         [src dst]
         (map ->reg
              (if (zero? d) [reg rm] [rm reg]))]
-    {:opcode opcode
-     :d d
-     :w w
-     :mod mod
-     :reg reg
-     :r/m rm
-     :src src
-     :dst dst}))
+    (locals opcode d w mod reg rm src dst)))
 
 (defn read-instructions [f]
   (with-open [r (io/input-stream f)]
