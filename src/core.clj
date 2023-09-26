@@ -126,18 +126,3 @@
           (recur (conj instructions (decode byte byte-stream))))))))
 
 (defn instructions->s [instructions] (str/join "\n" instructions))
-
-(comment
-  (decode-file "support/one-instruction")
-  (decode-file "support/multiple-instructions")
-
-  #_#_(= (bit-and byte-1 2r11110000) 2r10110000)
-  (let [w?
-        (zero? (bit-and byte-1 2r00000001))
-
-        reg
-        (bit-and byte-2 2r00000111)
-
-        ]
-    #_(locals src dst))
-  nil)
