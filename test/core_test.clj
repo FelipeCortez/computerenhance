@@ -1,7 +1,8 @@
 (ns core-test
   (:require [core :as sut]
             [clojure.string :as str]
-            [clojure.test :refer [deftest is testing]]))
+            [clojure.test :refer [deftest is]]
+            [clojure.java.shell :as shell]))
 
 (defn instructions [f]
   (->> f
@@ -16,3 +17,9 @@
 (deftest multiple []
   (is (= (instructions "support/multiple-instructions.asm")
          (sut/decode-file "support/multiple-instructions"))))
+
+(deftest multiple-opcodes []
+  (spit "support/assembly" (sut/instructions->s (sut/decode-file "support/multiple-opcodes")))
+  (shell/sh "nasm" "support/assembly" "-o" "support/assembled")
+  (is (= (slurp "support/multiple-opcodes")
+         (slurp "support/assembled"))))

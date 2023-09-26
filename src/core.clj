@@ -30,6 +30,16 @@
    2r110 :si
    2r111 :di})
 
+(def mod->regs
+  {2r000 [:bx :si]
+   2r001 [:bx :di]
+   2r010 [:bp :si]
+   2r011 [:bp :di]
+   2r100 [:si]
+   2r101 [:di]
+   2r110 [:bp]
+   2r111 [:bx]})
+
 (defmacro locals [& xs] (zipmap (map keyword xs) xs))
 
 (defn decode [byte byte-stream]
@@ -43,7 +53,7 @@
             w?
             (not (zero? (bit-and byte-1 2r00000001)))
 
-            _mod
+            mod
             (-> byte-2
                 (bit-and 2r11000000)
                 (bit-shift-right 6))
@@ -56,11 +66,56 @@
             rm
             (bit-and byte-2 2r00000111)
 
-            ->reg (if w? w1 w0)
+            ->reg
+            (if w? w1 w0)
+
+            [one two]
+            (case mod
+              2r11
+              (mapv (comp name ->reg) [reg rm])
+
+              2r00
+              [(name  (->reg reg))
+               (str "[" (str/join " + " (mapv name (mod->regs rm))) "]")]
+
+              2r01
+              (let [disp (.read byte-stream)]
+                [(name (->reg reg))
+                 (str "["
+                      (str/join " + " (cond-> (mapv name (mod->regs rm))
+                                        (not (zero? disp)) (conj disp)))
+                      "]")])
+
+              2r10
+              (let [disp (bit-or (.read byte-stream)
+                                 (bit-shift-left (.read byte-stream) 8))]
+                [(name (->reg reg))
+                 (str "["
+                      (str/join " + " (cond-> (mapv name (mod->regs rm))
+                                        (not (zero? disp)) (conj disp)))
+                      "]")]))
 
             [src dst]
-            (map ->reg (if d? [rm reg] [reg rm]))]
-        (format "mov %s, %s" (name dst) (name src))))))
+            (if d? [two one] [one two])]
+        (format "mov %s, %s" dst src))
+
+      ;; immediate to register
+      (= (bit-and byte-1 2r11110000) 2r10110000)
+      (let [w?
+            (not (zero? (bit-and byte-1 2r00001000)))
+
+            reg
+            (bit-and byte-1 2r00000111)
+
+            ->reg
+            (if w? w1 w0)
+
+            data
+            (if w?
+              (bit-or (bit-shift-left (.read byte-stream) 8)
+                      byte-2)
+              byte-2)]
+        (format "mov %s, %s" (-> reg ->reg name) data)))))
 
 (defn decode-file [f]
   (with-open [byte-stream (io/input-stream f)]
@@ -69,6 +124,8 @@
         (if (= byte -1)
           instructions
           (recur (conj instructions (decode byte byte-stream))))))))
+
+(defn instructions->s [instructions] (str/join "\n" instructions))
 
 (comment
   (decode-file "support/one-instruction")
