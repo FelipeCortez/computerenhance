@@ -8,7 +8,9 @@
   (->> f
        slurp
        str/split-lines
-       (filter #(str/starts-with? % "mov"))))
+       (filter (fn [line] (and (not (str/starts-with? line ";"))
+                               (not (str/starts-with? line "bits"))
+                               (not (str/blank? line)))))))
 
 (deftest one []
   (is (= (instructions "support/one-instruction.asm")

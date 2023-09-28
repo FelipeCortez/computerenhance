@@ -133,7 +133,7 @@
               byte-2)]
         (format "mov %s, %s" (-> reg ->reg name) data))
 
-      ;; immediate from register/memory
+      ;; immediate to register/memory
       (= (bit-and byte-1 2r11111100) 2r10000000)
       (let [s?
             (not (zero? (bit-and byte-1 2r00000010)))
@@ -158,6 +158,11 @@
 
             ->reg
             (if w? w1 w0)
+
+            bw-str
+            (if (= 2r11 mod)
+              ""
+              (if w? "word" "byte"))
 
             src
             (case mod
@@ -191,7 +196,32 @@
               (bit-or (bit-shift-left (.read byte-stream) 8)
                       data-byte-5)
               data-byte-5)]
-        (format "! %s %s, %s" op src data)))))
+        (format "%s %s %s, %s" op bw-str src data))
+
+      ;; immediate from accumulator
+      (= (bit-and byte-1 2r00000110) 2r00000100)
+      (let [w?
+            (not (zero? (bit-and byte-1 2r00000001)))
+
+            op
+            (-> byte-1
+                (bit-and 2r00111000)
+                (bit-shift-right 3)
+                opcode->op
+                #_name)
+
+            dst
+            (if w? "ax" "al")
+
+            data
+            (if w?
+              (bit-or (bit-shift-left (.read byte-stream) 8)
+                      byte-2)
+              byte-2)]
+        (format "%s %s, %s" op dst data))
+
+      :else [(Integer/toBinaryString byte-1)
+             (Integer/toBinaryString byte-2)])))
 
 (defn decode-file [f]
   (with-open [byte-stream (io/input-stream f)]
@@ -205,5 +235,9 @@
 
 
 (comment
-  (decode-file "support/add-sub-cmp-jnz")
+  (with-meta
+    (map vector
+         (decode-file "support/add-sub-cmp-jnz")
+         (core-test/instructions "support/add-sub-cmp-jnz.asm"))
+    {:portal.viewer/default :portal.viewer/table})
   )
