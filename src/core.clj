@@ -92,7 +92,12 @@
 
               2r00
               [(name  (->reg reg))
-               (str "[" (str/join " + " (mapv name (rm->regs rm))) "]")]
+               (if (= rm 2r110)
+                 (str "["
+                      (bit-or (.read byte-stream)
+                              (bit-shift-left (.read byte-stream) 8))
+                      "]")
+                 (str "[" (str/join " + " (mapv name (rm->regs rm))) "]"))]
 
               2r01
               (let [disp (.read byte-stream)]
@@ -170,7 +175,12 @@
               ((comp name ->reg) rm)
 
               2r00
-              (str "[" (str/join " + " (mapv name (rm->regs rm))) "]")
+              (if (= rm 2r110)
+                (str "["
+                     (bit-or (.read byte-stream)
+                             (bit-shift-left (.read byte-stream) 8))
+                     "]")
+                (str "[" (str/join " + " (mapv name (rm->regs rm))) "]"))
 
               2r01
               (let [disp (.read byte-stream)]
