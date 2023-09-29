@@ -51,6 +51,67 @@
 (defn decode [byte byte-stream]
   (let [byte-1 byte, byte-2 (.read byte-stream)]
     (cond
+      ; conditional jumps
+      (= byte-1 2r01110100)
+      (str "je " byte-2)
+
+      (= byte-1 2r01111100)
+      (str "jl " byte-2)
+
+      (= byte-1 2r01111110)
+      (str "jle " byte-2)
+
+      (= byte-1 2r01110010)
+      (str "jb " byte-2)
+
+      (= byte-1 2r01110110)
+      (str "jbe " byte-2)
+
+      (= byte-1 2r01111010)
+      (str "jp " byte-2)
+
+      (= byte-1 2r01110000)
+      (str "jo " byte-2)
+
+      (= byte-1 2r01111000)
+      (str "js " byte-2)
+
+      (= byte-1 2r01110101)
+      (str "jne " byte-2)
+
+      (= byte-1 2r01111101)
+      (str "jnl " byte-2)
+
+      (= byte-1 2r01111111)
+      (str "jnle " byte-2)
+
+      (= byte-1 2r01110011)
+      (str "jnb " byte-2)
+
+      (= byte-1 2r01110111)
+      (str "jnbe " byte-2)
+
+      (= byte-1 2r01111011)
+      (str "jnp " byte-2)
+
+      (= byte-1 2r01110001)
+      (str "jno " byte-2)
+
+      (= byte-1 2r01111001)
+      (str "jns " byte-2)
+
+      (= byte-1 2r11100010)
+      (str "loop " byte-2)
+
+      (= byte-1 2r11100001)
+      (str "loopz " byte-2)
+
+      (= byte-1 2r11100000)
+      (str "loopnz " byte-2)
+
+      (= byte-1 2r11100011)
+      (str "jcxz " byte-2)
+
       ;; register/memory to/from register
       (or (= (bit-and byte-1 2r11111100) 2r10001000)
           (= (bit-and byte-1 2r11111100) 2r00000000)
@@ -218,7 +279,7 @@
                 (bit-and 2r00111000)
                 (bit-shift-right 3)
                 opcode->op
-                #_name)
+                name)
 
             dst
             (if w? "ax" "al")
