@@ -293,6 +293,16 @@
 
 (defn instructions->s [instructions] (str/join "\n" instructions))
 
+(def registers (vals w1))
+
+(defn simulate [instructions]
+  (reduce (fn [computer [_op dst src]]
+            (if (number? src)
+              (assoc computer dst src)
+              (assoc computer dst (get computer src))))
+          (zipmap registers (repeat 0))
+          instructions))
+
 
 (comment
   (with-meta
@@ -300,4 +310,14 @@
          (map #(with-meta % {:portal.viewer/default :portal.viewer/pr-str}) (decode-file "support/add-sub-cmp-jnz"))
          (core-test/instructions "support/add-sub-cmp-jnz.asm"))
     {:portal.viewer/default :portal.viewer/table})
+
+  (map #(with-meta % {:portal.viewer/default :portal.viewer/pr-str})
+       (decode-file "support/movs"))
+
+  (def regs [:ax :bx :cx :dx :sp :bp :si :di])
+
+  (let [computer (simulate (decode-file "support/movs"))]
+    (with-meta
+      (map (juxt identity computer) regs)
+      {:portal.viewer/default :portal.viewer/table}))
   )
