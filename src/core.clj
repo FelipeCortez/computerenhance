@@ -53,64 +53,64 @@
     (cond
       ; conditional jumps
       (= byte-1 2r01110100)
-      (str "je " byte-2)
+      [:je byte-2]
 
       (= byte-1 2r01111100)
-      (str "jl " byte-2)
+      [:jl  byte-2]
 
       (= byte-1 2r01111110)
-      (str "jle " byte-2)
+      [:jle byte-2]
 
       (= byte-1 2r01110010)
-      (str "jb " byte-2)
+      [:jb  byte-2]
 
       (= byte-1 2r01110110)
-      (str "jbe " byte-2)
+      [:jbe  byte-2]
 
       (= byte-1 2r01111010)
-      (str "jp " byte-2)
+      [:jp  byte-2]
 
       (= byte-1 2r01110000)
-      (str "jo " byte-2)
+      [:jo  byte-2]
 
       (= byte-1 2r01111000)
-      (str "js " byte-2)
+      [:js  byte-2]
 
       (= byte-1 2r01110101)
-      (str "jne " byte-2)
+      [:jne  byte-2]
 
       (= byte-1 2r01111101)
-      (str "jnl " byte-2)
+      [:jnl  byte-2]
 
       (= byte-1 2r01111111)
-      (str "jnle " byte-2)
+      [:jnle  byte-2]
 
       (= byte-1 2r01110011)
-      (str "jnb " byte-2)
+      [:jnb  byte-2]
 
       (= byte-1 2r01110111)
-      (str "jnbe " byte-2)
+      [:jnbe  byte-2]
 
       (= byte-1 2r01111011)
-      (str "jnp " byte-2)
+      [:jnp  byte-2]
 
       (= byte-1 2r01110001)
-      (str "jno " byte-2)
+      [:jno  byte-2]
 
       (= byte-1 2r01111001)
-      (str "jns " byte-2)
+      [:jns  byte-2]
 
       (= byte-1 2r11100010)
-      (str "loop " byte-2)
+      [:loop  byte-2]
 
       (= byte-1 2r11100001)
-      (str "loopz " byte-2)
+      [:loopz  byte-2]
 
       (= byte-1 2r11100000)
-      (str "loopnz " byte-2)
+      [:loopnz  byte-2]
 
       (= byte-1 2r11100011)
-      (str "jcxz " byte-2)
+      [:jcxz  byte-2]
 
       ;; register/memory to/from register
       (or (= (bit-and byte-1 2r11111100) 2r10001000)
@@ -121,8 +121,7 @@
             (-> byte-1
                 (bit-and 2r00111000)
                 (bit-shift-right 3)
-                (opcode->op)
-                name)
+                (opcode->op))
 
             d?
             (not (zero? (bit-and byte-1 2r00000010)))
@@ -149,37 +148,33 @@
             [one two]
             (case mod
               2r11
-              (mapv (comp name ->reg) [reg rm])
+              (mapv ->reg [reg rm])
 
               2r00
-              [(name  (->reg reg))
+              [(->reg reg)
                (if (= rm 2r110)
-                 (str "["
-                      (bit-or (.read byte-stream)
-                              (bit-shift-left (.read byte-stream) 8))
-                      "]")
-                 (str "[" (str/join " + " (mapv name (rm->regs rm))) "]"))]
+                 (bit-or (.read byte-stream)
+                         (bit-shift-left (.read byte-stream) 8))
+                 (into [:+] (rm->regs rm)))]
 
               2r01
               (let [disp (.read byte-stream)]
-                [(name (->reg reg))
-                 (str "["
-                      (str/join " + " (cond-> (mapv name (rm->regs rm))
-                                        (not (zero? disp)) (conj disp)))
-                      "]")])
+                [(->reg reg)
+                 (into [:+]
+                       (cond-> (rm->regs rm)
+                         (not (zero? disp)) (conj disp)))])
 
               2r10
               (let [disp (bit-or (.read byte-stream)
                                  (bit-shift-left (.read byte-stream) 8))]
-                [(name (->reg reg))
-                 (str "["
-                      (str/join " + " (cond-> (mapv name (rm->regs rm))
-                                        (not (zero? disp)) (conj disp)))
-                      "]")]))
+                [(->reg reg)
+                 (into [:+]
+                       (cond-> (rm->regs rm)
+                         (not (zero? disp)) (conj disp)))]))
 
             [src dst]
             (if d? [two one] [one two])]
-        (format "%s %s, %s" op dst src))
+        [op dst src])
 
       ;; mov immediate to register
       (= (bit-and byte-1 2r11110000) 2r10110000)
@@ -197,11 +192,11 @@
               (bit-or (bit-shift-left (.read byte-stream) 8)
                       byte-2)
               byte-2)]
-        (format "mov %s, %s" (-> reg ->reg name) data))
+        [:mov (->reg reg) data])
 
       ;; immediate to register/memory
       (= (bit-and byte-1 2r11111100) 2r10000000)
-      (let [s?
+      (let [_s?
             (not (zero? (bit-and byte-1 2r00000010)))
 
             w?
@@ -216,8 +211,7 @@
             (-> byte-2
                 (bit-and 2r00111000)
                 (bit-shift-right 3)
-                opcode->op
-                name)
+                opcode->op)
 
             rm
             (bit-and byte-2 2r00000111)
@@ -225,38 +219,34 @@
             ->reg
             (if w? w1 w0)
 
-            bw-str
-            (if (= 2r11 mod)
-              ""
-              (if w? "word" "byte"))
-
             src
             (case mod
               2r11
-              ((comp name ->reg) rm)
+              (->reg rm)
 
               2r00
               (if (= rm 2r110)
-                (str "["
-                     (bit-or (.read byte-stream)
-                             (bit-shift-left (.read byte-stream) 8))
-                     "]")
-                (str "[" (str/join " + " (mapv name (rm->regs rm))) "]"))
+                [(bit-or (.read byte-stream) (bit-shift-left (.read byte-stream) 8))]
+                (into [:+] (rm->regs rm)))
 
               2r01
               (let [disp (.read byte-stream)]
-                (str "["
-                     (str/join " + " (cond-> (mapv name (rm->regs rm))
-                                       (not (zero? disp)) (conj disp)))
-                     "]"))
+                (cond-> (rm->regs rm)
+                  (not (zero? disp)) (conj disp)))
 
               2r10
               (let [disp (bit-or (.read byte-stream)
                                  (bit-shift-left (.read byte-stream) 8))]
-                (str "["
-                     (str/join " + " (cond-> (mapv name (rm->regs rm))
-                                       (not (zero? disp)) (conj disp)))
-                     "]")))
+                (into [:+]
+                      (cond-> (rm->regs rm)
+                        (not (zero? disp)) (conj disp)))))
+
+
+            src
+            (if (= 2r11 mod)
+              src
+              [(if w? :word :byte) src])
+
 
             data-byte-5
             (.read byte-stream)
@@ -267,7 +257,7 @@
               (bit-or (bit-shift-left (.read byte-stream) 8)
                       data-byte-5)
               data-byte-5)]
-        (format "%s %s %s, %s" op bw-str src data))
+        [op src data])
 
       ;; immediate from accumulator
       (= (bit-and byte-1 2r00000110) 2r00000100)
@@ -278,18 +268,17 @@
             (-> byte-1
                 (bit-and 2r00111000)
                 (bit-shift-right 3)
-                opcode->op
-                name)
+                opcode->op)
 
             dst
-            (if w? "ax" "al")
+            (if w? :ax :al)
 
             data
             (if w?
               (bit-or (bit-shift-left (.read byte-stream) 8)
                       byte-2)
               byte-2)]
-        (format "%s %s, %s" op dst data))
+        [op dst data])
 
       :else [(Integer/toBinaryString byte-1)
              (Integer/toBinaryString byte-2)])))
@@ -308,7 +297,7 @@
 (comment
   (with-meta
     (map vector
-         (decode-file "support/add-sub-cmp-jnz")
+         (map #(with-meta % {:portal.viewer/default :portal.viewer/pr-str}) (decode-file "support/add-sub-cmp-jnz"))
          (core-test/instructions "support/add-sub-cmp-jnz.asm"))
     {:portal.viewer/default :portal.viewer/table})
   )
