@@ -196,7 +196,7 @@
 
       ;; immediate to register/memory
       (= (bit-and byte-1 2r11111100) 2r10000000)
-      (let [_s?
+      (let [s?
             (not (zero? (bit-and byte-1 2r00000010)))
 
             w?
@@ -252,8 +252,7 @@
             (.read byte-stream)
 
             data
-            data-byte-5
-            #_(if w?
+            (if (and (not s?) w?)
               (bit-or (bit-shift-left (.read byte-stream) 8)
                       data-byte-5)
               data-byte-5)]
@@ -295,13 +294,57 @@
 
 (def registers (vals w1))
 
-(defn simulate [instructions]
-  (reduce (fn [computer [_op dst src]]
-            (if (number? src)
-              (assoc computer dst src)
-              (assoc computer dst (get computer src))))
-          (zipmap registers (repeat 0))
-          instructions))
+(defn signed-16? [n]
+  (not (zero? (bit-and n #=(bit-shift-left 1 15)))))
+
+(defn simulate [instructions & {:keys [step-by-step?]}]
+  ((if step-by-step? reductions reduce)
+   (fn [computer [op dst src]]
+     (case op
+       :mov
+       (if (number? src)
+         (assoc computer dst src)
+         (assoc computer dst (get computer src)))
+
+       :add
+       (let [result
+             (if (number? src)
+               (+ (get computer dst) src)
+               (+ (get computer dst) (get computer src)))
+
+             flags
+             {:s? (signed-16? result)
+              :z? (zero? result)}]
+         (-> computer
+             (assoc dst result)
+             (assoc :flags flags)))
+
+
+       :sub
+       (let [result
+             (if (number? src)
+               (- (get computer dst) src)
+               (- (get computer dst) (get computer src)))
+
+             flags
+             {:s? (signed-16? result)
+              :z? (zero? result)}]
+         (-> computer
+             (assoc dst result)
+             (assoc :flags flags)))
+
+       :cmp
+       (let [result
+             (if (number? src)
+               (- (get computer dst) src)
+               (- (get computer dst) (get computer src)))
+
+             flags
+             {:s? (signed-16? result)
+              :z? (zero? result)}]
+         (assoc computer :flags flags))))
+   (zipmap registers (repeat 0))
+   instructions))
 
 
 (comment
@@ -320,4 +363,10 @@
     (with-meta
       (map (juxt identity computer) regs)
       {:portal.viewer/default :portal.viewer/table}))
+
+  (with-meta
+    (simulate (decode-file "support/add-sub-cmp-exec")
+              {:step-by-step? true})
+    {:portal.viewer/default :portal.viewer/table})
+
   )
