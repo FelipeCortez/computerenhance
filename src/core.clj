@@ -46,8 +46,6 @@
    2r101 :sub
    2r111 :cmp})
 
-(defmacro locals [& xs] (zipmap (map keyword xs) xs))
-
 (defn decode [byte byte-stream]
   (let [byte-1 byte
         *bytes-read (atom 1)
@@ -287,8 +285,7 @@
                byte-2)]
          [op dst data])
 
-       :else [(Integer/toBinaryString byte-1)
-              (Integer/toBinaryString byte-2)])
+       :else [(binary byte-1) (binary byte-2)])
      @*bytes-read]))
 
 (defn decode-file [f]
