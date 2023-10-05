@@ -48,11 +48,11 @@
 
 (defn decode [byte byte-stream]
   (let [byte-1 byte
-        *bytes-read (atom 1)
+        *bytes-read (volatile! 1)
 
         next-byte!
         (fn []
-          (swap! *bytes-read inc)
+          (vswap! *bytes-read inc)
           (.read byte-stream))
 
         byte-2 (next-byte!)]
