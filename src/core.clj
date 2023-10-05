@@ -49,246 +49,257 @@
 (defmacro locals [& xs] (zipmap (map keyword xs) xs))
 
 (defn decode [byte byte-stream]
-  (let [byte-1 byte, byte-2 (.read byte-stream)]
-    (cond
-      ; conditional jumps
-      (= byte-1 2r01110100)
-      [:je byte-2]
+  (let [byte-1 byte
+        *bytes-read (atom 1)
 
-      (= byte-1 2r01111100)
-      [:jl  byte-2]
+        next-byte!
+        (fn []
+          (swap! *bytes-read inc)
+          (.read byte-stream))
 
-      (= byte-1 2r01111110)
-      [:jle byte-2]
+        byte-2 (next-byte!)]
+    [(cond
+       ;; conditional jumps
+       (= byte-1 2r01110100)
+       [:je byte-2]
 
-      (= byte-1 2r01110010)
-      [:jb  byte-2]
+       (= byte-1 2r01111100)
+       [:jl  byte-2]
 
-      (= byte-1 2r01110110)
-      [:jbe  byte-2]
+       (= byte-1 2r01111110)
+       [:jle byte-2]
 
-      (= byte-1 2r01111010)
-      [:jp  byte-2]
+       (= byte-1 2r01110010)
+       [:jb  byte-2]
 
-      (= byte-1 2r01110000)
-      [:jo  byte-2]
+       (= byte-1 2r01110110)
+       [:jbe  byte-2]
 
-      (= byte-1 2r01111000)
-      [:js  byte-2]
+       (= byte-1 2r01111010)
+       [:jp  byte-2]
 
-      (= byte-1 2r01110101)
-      [:jne  byte-2]
+       (= byte-1 2r01110000)
+       [:jo  byte-2]
 
-      (= byte-1 2r01111101)
-      [:jnl  byte-2]
+       (= byte-1 2r01111000)
+       [:js  byte-2]
 
-      (= byte-1 2r01111111)
-      [:jnle  byte-2]
+       (= byte-1 2r01110101)
+       [:jne  byte-2]
 
-      (= byte-1 2r01110011)
-      [:jnb  byte-2]
+       (= byte-1 2r01111101)
+       [:jnl  byte-2]
 
-      (= byte-1 2r01110111)
-      [:jnbe  byte-2]
+       (= byte-1 2r01111111)
+       [:jnle  byte-2]
 
-      (= byte-1 2r01111011)
-      [:jnp  byte-2]
+       (= byte-1 2r01110011)
+       [:jnb  byte-2]
 
-      (= byte-1 2r01110001)
-      [:jno  byte-2]
+       (= byte-1 2r01110111)
+       [:jnbe  byte-2]
 
-      (= byte-1 2r01111001)
-      [:jns  byte-2]
+       (= byte-1 2r01111011)
+       [:jnp  byte-2]
 
-      (= byte-1 2r11100010)
-      [:loop  byte-2]
+       (= byte-1 2r01110001)
+       [:jno  byte-2]
 
-      (= byte-1 2r11100001)
-      [:loopz  byte-2]
+       (= byte-1 2r01111001)
+       [:jns  byte-2]
 
-      (= byte-1 2r11100000)
-      [:loopnz  byte-2]
+       (= byte-1 2r11100010)
+       [:loop  byte-2]
 
-      (= byte-1 2r11100011)
-      [:jcxz  byte-2]
+       (= byte-1 2r11100001)
+       [:loopz  byte-2]
 
-      ;; register/memory to/from register
-      (or (= (bit-and byte-1 2r11111100) 2r10001000)
-          (= (bit-and byte-1 2r11111100) 2r00000000)
-          (= (bit-and byte-1 2r11111100) 2r00101000)
-          (= (bit-and byte-1 2r11111100) 2r00111000))
-      (let [op
-            (-> byte-1
-                (bit-and 2r00111000)
-                (bit-shift-right 3)
-                (opcode->op))
+       (= byte-1 2r11100000)
+       [:loopnz  byte-2]
 
-            d?
-            (not (zero? (bit-and byte-1 2r00000010)))
+       (= byte-1 2r11100011)
+       [:jcxz  byte-2]
 
-            w?
-            (not (zero? (bit-and byte-1 2r00000001)))
+       ;; register/memory to/from register
+       (or (= (bit-and byte-1 2r11111100) 2r10001000)
+           (= (bit-and byte-1 2r11111100) 2r00000000)
+           (= (bit-and byte-1 2r11111100) 2r00101000)
+           (= (bit-and byte-1 2r11111100) 2r00111000))
+       (let [op
+             (-> byte-1
+                 (bit-and 2r00111000)
+                 (bit-shift-right 3)
+                 (opcode->op))
 
-            mod
-            (-> byte-2
-                (bit-and 2r11000000)
-                (bit-shift-right 6))
+             d?
+             (not (zero? (bit-and byte-1 2r00000010)))
 
-            reg
-            (-> byte-2
-                (bit-and 2r00111000)
-                (bit-shift-right 3))
+             w?
+             (not (zero? (bit-and byte-1 2r00000001)))
 
-            rm
-            (bit-and byte-2 2r00000111)
+             mod
+             (-> byte-2
+                 (bit-and 2r11000000)
+                 (bit-shift-right 6))
 
-            ->reg
-            (if w? w1 w0)
+             reg
+             (-> byte-2
+                 (bit-and 2r00111000)
+                 (bit-shift-right 3))
 
-            [one two]
-            (case mod
-              2r11
-              (mapv ->reg [reg rm])
+             rm
+             (bit-and byte-2 2r00000111)
 
-              2r00
-              [(->reg reg)
+             ->reg
+             (if w? w1 w0)
+
+             [one two]
+             (case mod
+               2r11
+               (mapv ->reg [reg rm])
+
+               2r00
+               [(->reg reg)
+                (if (= rm 2r110)
+                  (bit-or (next-byte!)
+                          (bit-shift-left (next-byte!) 8))
+                  (into [:+] (rm->regs rm)))]
+
+               2r01
+               (let [disp (next-byte!)]
+                 [(->reg reg)
+                  (into [:+]
+                        (cond-> (rm->regs rm)
+                          (not (zero? disp)) (conj disp)))])
+
+               2r10
+               (let [disp (bit-or (next-byte!)
+                                  (bit-shift-left (next-byte!) 8))]
+                 [(->reg reg)
+                  (into [:+]
+                        (cond-> (rm->regs rm)
+                          (not (zero? disp)) (conj disp)))]))
+
+             [src dst]
+             (if d? [two one] [one two])]
+         [op dst src])
+
+       ;; mov immediate to register
+       (= (bit-and byte-1 2r11110000) 2r10110000)
+       (let [w?
+             (not (zero? (bit-and byte-1 2r00001000)))
+
+             reg
+             (bit-and byte-1 2r00000111)
+
+             ->reg
+             (if w? w1 w0)
+
+             data
+             (if w?
+               (bit-or (bit-shift-left (next-byte!) 8)
+                       byte-2)
+               byte-2)]
+         [:mov (->reg reg) data])
+
+       ;; immediate to register/memory
+       (= (bit-and byte-1 2r11111100) 2r10000000)
+       (let [s?
+             (not (zero? (bit-and byte-1 2r00000010)))
+
+             w?
+             (not (zero? (bit-and byte-1 2r00000001)))
+
+             mod
+             (-> byte-2
+                 (bit-and 2r11000000)
+                 (bit-shift-right 6))
+
+             op
+             (-> byte-2
+                 (bit-and 2r00111000)
+                 (bit-shift-right 3)
+                 opcode->op)
+
+             rm
+             (bit-and byte-2 2r00000111)
+
+             ->reg
+             (if w? w1 w0)
+
+             src
+             (case mod
+               2r11
+               (->reg rm)
+
+               2r00
                (if (= rm 2r110)
-                 (bit-or (.read byte-stream)
-                         (bit-shift-left (.read byte-stream) 8))
-                 (into [:+] (rm->regs rm)))]
+                 [(bit-or (next-byte!) (bit-shift-left (.read byte-stream) 8))]
+                 (into [:+] (rm->regs rm)))
 
-              2r01
-              (let [disp (.read byte-stream)]
-                [(->reg reg)
+               2r01
+               (let [disp (next-byte!)]
+                 (cond-> (rm->regs rm)
+                   (not (zero? disp)) (conj disp)))
+
+               2r10
+               (let [disp (bit-or (next-byte!)
+                                  (bit-shift-left (next-byte!) 8))]
                  (into [:+]
                        (cond-> (rm->regs rm)
-                         (not (zero? disp)) (conj disp)))])
-
-              2r10
-              (let [disp (bit-or (.read byte-stream)
-                                 (bit-shift-left (.read byte-stream) 8))]
-                [(->reg reg)
-                 (into [:+]
-                       (cond-> (rm->regs rm)
-                         (not (zero? disp)) (conj disp)))]))
-
-            [src dst]
-            (if d? [two one] [one two])]
-        [op dst src])
-
-      ;; mov immediate to register
-      (= (bit-and byte-1 2r11110000) 2r10110000)
-      (let [w?
-            (not (zero? (bit-and byte-1 2r00001000)))
-
-            reg
-            (bit-and byte-1 2r00000111)
-
-            ->reg
-            (if w? w1 w0)
-
-            data
-            (if w?
-              (bit-or (bit-shift-left (.read byte-stream) 8)
-                      byte-2)
-              byte-2)]
-        [:mov (->reg reg) data])
-
-      ;; immediate to register/memory
-      (= (bit-and byte-1 2r11111100) 2r10000000)
-      (let [s?
-            (not (zero? (bit-and byte-1 2r00000010)))
-
-            w?
-            (not (zero? (bit-and byte-1 2r00000001)))
-
-            mod
-            (-> byte-2
-                (bit-and 2r11000000)
-                (bit-shift-right 6))
-
-            op
-            (-> byte-2
-                (bit-and 2r00111000)
-                (bit-shift-right 3)
-                opcode->op)
-
-            rm
-            (bit-and byte-2 2r00000111)
-
-            ->reg
-            (if w? w1 w0)
-
-            src
-            (case mod
-              2r11
-              (->reg rm)
-
-              2r00
-              (if (= rm 2r110)
-                [(bit-or (.read byte-stream) (bit-shift-left (.read byte-stream) 8))]
-                (into [:+] (rm->regs rm)))
-
-              2r01
-              (let [disp (.read byte-stream)]
-                (cond-> (rm->regs rm)
-                  (not (zero? disp)) (conj disp)))
-
-              2r10
-              (let [disp (bit-or (.read byte-stream)
-                                 (bit-shift-left (.read byte-stream) 8))]
-                (into [:+]
-                      (cond-> (rm->regs rm)
-                        (not (zero? disp)) (conj disp)))))
+                         (not (zero? disp)) (conj disp)))))
 
 
-            src
-            (if (= 2r11 mod)
-              src
-              [(if w? :word :byte) src])
+             src
+             (if (= 2r11 mod)
+               src
+               [(if w? :word :byte) src])
 
 
-            data-byte-5
-            (.read byte-stream)
+             data-byte-5
+             (next-byte!)
 
-            data
-            (if (and (not s?) w?)
-              (bit-or (bit-shift-left (.read byte-stream) 8)
-                      data-byte-5)
-              data-byte-5)]
-        [op src data])
+             data
+             (if (and (not s?) w?)
+               (bit-or (bit-shift-left (next-byte!) 8)
+                       data-byte-5)
+               data-byte-5)]
+         [op src data])
 
-      ;; immediate from accumulator
-      (= (bit-and byte-1 2r00000110) 2r00000100)
-      (let [w?
-            (not (zero? (bit-and byte-1 2r00000001)))
+       ;; immediate from accumulator
+       (= (bit-and byte-1 2r00000110) 2r00000100)
+       (let [w?
+             (not (zero? (bit-and byte-1 2r00000001)))
 
-            op
-            (-> byte-1
-                (bit-and 2r00111000)
-                (bit-shift-right 3)
-                opcode->op)
+             op
+             (-> byte-1
+                 (bit-and 2r00111000)
+                 (bit-shift-right 3)
+                 opcode->op)
 
-            dst
-            (if w? :ax :al)
+             dst
+             (if w? :ax :al)
 
-            data
-            (if w?
-              (bit-or (bit-shift-left (.read byte-stream) 8)
-                      byte-2)
-              byte-2)]
-        [op dst data])
+             data
+             (if w?
+               (bit-or (bit-shift-left (next-byte!) 8)
+                       byte-2)
+               byte-2)]
+         [op dst data])
 
-      :else [(Integer/toBinaryString byte-1)
-             (Integer/toBinaryString byte-2)])))
+       :else [(Integer/toBinaryString byte-1)
+              (Integer/toBinaryString byte-2)])
+     @*bytes-read]))
 
 (defn decode-file [f]
   (with-open [byte-stream (io/input-stream f)]
-    (loop [instructions []]
+    (loop [instructions [], bytes-so-far 0]
       (let [byte (.read byte-stream)]
         (if (= byte -1)
           instructions
-          (recur (conj instructions (decode byte byte-stream))))))))
+          (let [[instruction bytes-read] (decode byte byte-stream)]
+            (recur (conj instructions [bytes-so-far [instruction bytes-read]])
+                   (+ bytes-so-far bytes-read))))))))
 
 (defn instructions->s [instructions] (str/join "\n" instructions))
 
@@ -297,76 +308,62 @@
 (defn signed-16? [n]
   (not (zero? (bit-and n #=(bit-shift-left 1 15)))))
 
-(defn simulate [instructions & {:keys [step-by-step?]}]
-  ((if step-by-step? reductions reduce)
-   (fn [computer [op dst src]]
-     (case op
-       :mov
-       (if (number? src)
-         (assoc computer dst src)
-         (assoc computer dst (get computer src)))
-
-       :add
-       (let [result
+(defn simulate [instructions]
+  (let [ip->instr (into {} instructions)
+        max-ip (reduce max (keys ip->instr))]
+    (loop [computer (assoc (zipmap registers (repeat 0)) :ip 0)]
+      (if (> (:ip computer) max-ip)
+        computer
+        (let [[[op dst src] instr-bytes] (ip->instr (:ip computer))
+              computer (update computer :ip + instr-bytes)]
+          (recur
+           (case op
+             :mov
              (if (number? src)
-               (+ (get computer dst) src)
-               (+ (get computer dst) (get computer src)))
+               (assoc computer dst src)
+               (assoc computer dst (get computer src)))
 
-             flags
-             {:s? (signed-16? result)
-              :z? (zero? result)}]
-         (-> computer
-             (assoc dst result)
-             (assoc :flags flags)))
+             :add
+             (let [result
+                   (if (number? src)
+                     (+ (get computer dst) src)
+                     (+ (get computer dst) (get computer src)))
+
+                   flags
+                   {:s? (signed-16? result)
+                    :z? (zero? result)}]
+               (-> computer
+                   (assoc dst result)
+                   (assoc :flags flags)))
 
 
-       :sub
-       (let [result
-             (if (number? src)
-               (- (get computer dst) src)
-               (- (get computer dst) (get computer src)))
+             :sub
+             (let [result
+                   (if (number? src)
+                     (- (get computer dst) src)
+                     (- (get computer dst) (get computer src)))
 
-             flags
-             {:s? (signed-16? result)
-              :z? (zero? result)}]
-         (-> computer
-             (assoc dst result)
-             (assoc :flags flags)))
+                   flags
+                   {:s? (signed-16? result)
+                    :z? (zero? result)}]
+               (-> computer
+                   (assoc dst result)
+                   (assoc :flags flags)))
 
-       :cmp
-       (let [result
-             (if (number? src)
-               (- (get computer dst) src)
-               (- (get computer dst) (get computer src)))
+             :cmp
+             (let [result
+                   (if (number? src)
+                     (- (get computer dst) src)
+                     (- (get computer dst) (get computer src)))
 
-             flags
-             {:s? (signed-16? result)
-              :z? (zero? result)}]
-         (assoc computer :flags flags))))
-   (zipmap registers (repeat 0))
-   instructions))
+                   flags
+                   {:s? (signed-16? result)
+                    :z? (zero? result)}]
+               (assoc computer :flags flags)))))))))
 
 
 (comment
   (with-meta
-    (map vector
-         (map #(with-meta % {:portal.viewer/default :portal.viewer/pr-str}) (decode-file "support/add-sub-cmp-jnz"))
-         (core-test/instructions "support/add-sub-cmp-jnz.asm"))
+    (simulate (decode-file "support/track-ip"))
     {:portal.viewer/default :portal.viewer/table})
-
-  (map #(with-meta % {:portal.viewer/default :portal.viewer/pr-str})
-       (decode-file "support/movs"))
-
-  (def regs [:ax :bx :cx :dx :sp :bp :si :di])
-
-  (let [computer (simulate (decode-file "support/movs"))]
-    (with-meta
-      (map (juxt identity computer) regs)
-      {:portal.viewer/default :portal.viewer/table}))
-
-  (with-meta
-    (simulate (decode-file "support/add-sub-cmp-exec")
-              {:step-by-step? true})
-    {:portal.viewer/default :portal.viewer/table})
-
   )
