@@ -359,11 +359,15 @@
                    flags
                    {:s? (signed-16? result)
                     :z? (zero? result)}]
-               (assoc computer :flags flags)))))))))
+               (assoc computer :flags flags))
 
+             :jne
+             (if (:z? (:flags computer))
+               computer
+               (update computer :ip + (unchecked-byte dst))))))))))
 
 (comment
   (with-meta
-    (simulate (decode-file "support/track-ip"))
+    (simulate (decode-file "support/conditional-jump"))
     {:portal.viewer/default :portal.viewer/table})
   )
